@@ -1,0 +1,28 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    gcc \
+    g++ \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Poetry
+RUN pip install poetry==1.7.1
+
+# Copy dependency files
+COPY pyproject.toml ./
+
+# Install dependencies
+RUN poetry config virtualenvs.create false \
+    && poetry install --no-dev --no-interaction --no-ansi
+
+# Copy application code
+COPY src/ ./src/
+
+# Create necessary directories
+RUN mkdir -p /app/data /app/logs
+
+# Run Celery worker
+CMD ["celery", "-A", "src.data_collection.infrastructure.tasks.celery_app", "worker", "--loglevel=info"]

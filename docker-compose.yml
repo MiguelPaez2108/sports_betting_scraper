@@ -1,0 +1,168 @@
+version: '3.8'
+
+services:
+  # PostgreSQL with TimescaleDB
+  postgres:
+    image: timescale/timescaledb:latest-pg15
+    container_name: betting_postgres
+    environment:
+      POSTGRES_DB: betting_db
+      POSTGRES_USER: betting_user
+      POSTGRES_PASSWORD: betting_pass_change_in_prod
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U betting_user -d betting_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - betting_network
+
+  # MongoDB for raw scraping data
+  mongodb:
+    image: mongo:7.0
+    container_name: betting_mongodb
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: betting_user
+      MONGO_INITDB_ROOT_PASSWORD: betting_pass_change_in_prod
+      MONGO_INITDB_DATABASE: betting_raw
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - betting_network
+
+  # Redis for caching and Celery broker
+  redis:
+    image: redis:7-alpine
+    container_name: betting_redis
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - betting_network
+
+  # FastAPI Backend
+  backend:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/Dockerfile.backend
+    container_name: betting_backend
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://betting_user:betting_pass_change_in_prod@postgres:5432/betting_db
+      - MONGODB_URL=mongodb://betting_user:betting_pass_change_in_prod@mongodb:27017/betting_raw?authSource=admin
+      - REDIS_URL=redis://redis:6379/0
+      - FOOTBALL_DATA_API_KEY=${FOOTBALL_DATA_API_KEY}
+      - ODDS_API_KEY=${ODDS_API_KEY}
+      - ENVIRONMENT=development
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./src:/app/src
+      - ./models:/app/models
+      - ./data:/app/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - betting_network
+    command: uvicorn src.api.main:app --host 0.0.0.0 --port 8000 --reload
+
+  # Celery Worker
+  celery_worker:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/Dockerfile.celery
+    container_name: betting_celery_worker
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://betting_user:betting_pass_change_in_prod@postgres:5432/betting_db
+      - MONGODB_URL=mongodb://betting_user:betting_pass_change_in_prod@mongodb:27017/betting_raw?authSource=admin
+      - REDIS_URL=redis://redis:6379/0
+      - FOOTBALL_DATA_API_KEY=${FOOTBALL_DATA_API_KEY}
+      - ODDS_API_KEY=${ODDS_API_KEY}
+    volumes:
+      - ./src:/app/src
+      - ./data:/app/data
+    depends_on:
+      - redis
+      - postgres
+      - mongodb
+    networks:
+      - betting_network
+    command: celery -A src.data_collection.infrastructure.tasks.celery_app worker --loglevel=info
+
+  # Celery Beat (Scheduler)
+  celery_beat:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/Dockerfile.celery
+    container_name: betting_celery_beat
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+    volumes:
+      - ./src:/app/src
+    depends_on:
+      - redis
+    networks:
+      - betting_network
+    command: celery -A src.data_collection.infrastructure.tasks.celery_app beat --loglevel=info
+
+  # Flower (Celery monitoring)
+  flower:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/Dockerfile.celery
+    container_name: betting_flower
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+    ports:
+      - "5555:5555"
+    depends_on:
+      - redis
+      - celery_worker
+    networks:
+      - betting_network
+    command: celery -A src.data_collection.infrastructure.tasks.celery_app flower --port=5555
+
+  # Nginx reverse proxy
+  nginx:
+    image: nginx:alpine
+    container_name: betting_nginx
+    ports:
+      - "80:80"
+    volumes:
+      - ./infrastructure/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - backend
+    networks:
+      - betting_network
+
+volumes:
+  postgres_data:
+  mongodb_data:
+  redis_data:
+
+networks:
+  betting_network:
+    driver: bridge
