@@ -1,64 +1,93 @@
 """
-Structured logging configuration using python-json-logger.
-Provides consistent logging across the application.
+Logging Configuration
+
+Structured JSON logging with different levels and formatters.
 """
+
 import logging
 import sys
-from pythonjsonlogger import jsonlogger
+from typing import Optional
+from pathlib import Path
 
-from src.shared.config.settings import settings
-
-
-class CustomJsonFormatter(jsonlogger.JsonFormatter):
-    """Custom JSON formatter with additional fields"""
-    
-    def add_fields(self, log_record, record, message_dict):
-        super(CustomJsonFormatter, self).add_fields(log_record, record, message_dict)
-        log_record['environment'] = settings.environment
-        log_record['service'] = 'betting-predictor'
+import structlog
+from structlog.stdlib import LoggerFactory
 
 
-def setup_logger(name: str = __name__) -> logging.Logger:
+def setup_logging(
+    log_level: str = "INFO",
+    log_file: Optional[str] = None,
+    json_logs: bool = True,
+) -> None:
     """
-    Setup structured logger
+    Configure structured logging for the application
+    
+    Args:
+        log_level: Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+        log_file: Optional file path for log output
+        json_logs: Whether to use JSON formatting (True) or human-readable (False)
+    """
+    # Configure standard library logging
+    logging.basicConfig(
+        format="%(message)s",
+        stream=sys.stdout,
+        level=getattr(logging, log_level.upper()),
+    )
+    
+    # Structlog processors
+    processors = [
+        structlog.stdlib.filter_by_level,
+        structlog.stdlib.add_logger_name,
+        structlog.stdlib.add_log_level,
+        structlog.stdlib.PositionalArgumentsFormatter(),
+        structlog.processors.TimeStamper(fmt="iso"),
+        structlog.processors.StackInfoRenderer(),
+        structlog.processors.format_exc_info,
+        structlog.processors.UnicodeDecoder(),
+    ]
+    
+    # Add JSON or console renderer
+    if json_logs:
+        processors.append(structlog.processors.JSONRenderer())
+    else:
+        processors.append(structlog.dev.ConsoleRenderer())
+    
+    # Configure structlog
+    structlog.configure(
+        processors=processors,
+        context_class=dict,
+        logger_factory=LoggerFactory(),
+        wrapper_class=structlog.stdlib.BoundLogger,
+        cache_logger_on_first_use=True,
+    )
+    
+    # Add file handler if specified
+    if log_file:
+        log_path = Path(log_file)
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        file_handler = logging.FileHandler(log_file)
+        file_handler.setLevel(getattr(logging, log_level.upper()))
+        
+        root_logger = logging.getLogger()
+        root_logger.addHandler(file_handler)
+
+
+def get_logger(name: str) -> structlog.stdlib.BoundLogger:
+    """
+    Get a configured logger instance
     
     Args:
         name: Logger name (usually __name__)
     
     Returns:
-        Configured logger instance
+        Configured structlog logger
+    
+    Example:
+        logger = get_logger(__name__)
+        logger.info("message", key="value")
     """
-    logger = logging.getLogger(name)
-    
-    # Set level from settings
-    log_level = getattr(logging, settings.log_level.upper(), logging.INFO)
-    logger.setLevel(log_level)
-    
-    # Avoid duplicate handlers
-    if logger.handlers:
-        return logger
-    
-    # Console handler
-    handler = logging.StreamHandler(sys.stdout)
-    handler.setLevel(log_level)
-    
-    # JSON formatter for production, simple for development
-    if settings.environment == "production":
-        formatter = CustomJsonFormatter(
-            '%(timestamp)s %(level)s %(name)s %(message)s',
-            rename_fields={'levelname': 'level', 'asctime': 'timestamp'}
-        )
-    else:
-        formatter = logging.Formatter(
-            '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-            datefmt='%Y-%m-%d %H:%M:%S'
-        )
-    
-    handler.setFormatter(formatter)
-    logger.addHandler(handler)
-    
-    return logger
+    return structlog.get_logger(name)
 
 
-# Global logger instance
-logger = setup_logger("betting_predictor")
+# Initialize logging on module import
+setup_logging()
