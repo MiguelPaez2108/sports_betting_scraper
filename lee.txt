@@ -1,0 +1,639 @@
+Necesito tu ayuda como **experto en data science deportivo, web scraping y sistemas de predicción** para desarrollar un sistema altamente efectivo de análisis de apuestas de fútbol.
+
+## APIs Disponibles (CRÍTICO - USAR ESTAS PRIMERO)
+
+**TENGO ACCESO A ESTAS APIs - DEBEN SER LA BASE DEL SISTEMA:**
+
+### 1. Football-Data.org API
+```
+API Key: 3e45363c9c074c9d9254a155d6f89020
+Endpoint: https://api.football-data.org/v4/
+
+Proporciona:
+- Datos de partidos en vivo y programados
+- Estadísticas de equipos y jugadores
+- Clasificaciones de ligas
+- Historial de partidos (H2H)
+- Formaciones y alineaciones
+```
+
+### 2. The Odds API
+```
+API Key: aa55ec5be4748f07a76766ac6f1efc19
+Endpoint: https://api.the-odds-api.com/
+
+Proporciona:
+- Cuotas en tiempo real de múltiples casas
+- Comparación de odds entre bookmakers
+- Histórico de movimiento de líneas
+- Cobertura de múltiples mercados
+- Datos de cierre de líneas
+```
+
+### REQUISITO IMPORTANTE:
+- **Prioriza estas APIs sobre web scraping** - son más confiables y rápidas
+- Usa web scraping SOLO para datos que las APIs no proporcionen
+- Implementa cache inteligente para no exceder rate limits
+- Integra ambas APIs para correlacionar odds con estadísticas
+
+### Arquitectura de Integración:
+```python
+# El sistema debe:
+1. Consultar Football-Data API para estadísticas y datos de partidos
+2. Consultar Odds API para cuotas actualizadas
+3. Combinar ambos datasets en el motor de análisis
+4. Usar scraping complementario solo si es necesario
+5. Cachear respuestas para optimizar requests
+```
+
+---
+
+## 🎯 METODOLOGÍA DE TRABAJO REQUERIDA
+
+**IMPORTANTE**: No quiero solo código. Necesito que sigas esta metodología paso a paso:
+
+### Fase 1: Planificación y Diseño (OBLIGATORIO ANTES DE CODEAR)
+```
+1. Dame un documento de arquitectura técnica detallado que incluya:
+   - Diagrama de flujo de datos completo
+   - Diagrama de componentes y sus relaciones
+   - Decisiones arquitectónicas con pros/cons
+   - Patrones de diseño a utilizar y por qué
+   
+2. Plan de implementación con fases:
+   - Sprint 1: Setup + Integración APIs (días 1-3)
+   - Sprint 2: Motor ML + Feature Engineering (días 4-7)
+   - Sprint 3: Sistema de recomendaciones (días 8-10)
+   - Sprint 4: Frontend + Testing (días 11-14)
+   
+3. Definición de métricas de éxito:
+   - Accuracy mínimo objetivo: 65%
+   - Precision por mercado
+   - ROI esperado
+   - Sharpe Ratio del sistema
+```
+
+### Fase 2: Implementación Incremental
+```
+Por favor implementa el sistema en módulos independientes y testeables:
+
+1. Primero: Data Collection Layer
+   - Integradores de APIs con tests
+   - Cache layer con Redis
+   - Rate limiters
+   
+2. Segundo: Feature Engineering
+   - Pipeline de transformación de datos
+   - Cálculo de estadísticas avanzadas
+   - Feature store
+
+3. Tercero: ML Models
+   - Baseline model simple (regresión logística)
+   - Modelos avanzados (XGBoost, ensemble)
+   - Backtesting framework
+   
+4. Cuarto: Business Logic
+   - Sistema de recomendaciones
+   - Cálculo de value bets
+   - Gestión de bankroll
+   
+5. Quinto: API + Frontend
+   - REST API con FastAPI
+   - UI con Next.js
+```
+
+### Fase 3: Validación y Optimización
+```
+1. Backtesting sobre datos históricos (mínimo 6 meses)
+2. Walk-forward validation
+3. Análisis de sensibilidad de parámetros
+4. Optimización de hiperparámetros
+5. A/B testing de diferentes estrategias
+```
+- **Evaluación crítica**: Mi calificación depende DIRECTAMENTE de la tasa de acierto del sistema
+- **Requisito**: Alta efectividad predictiva - si no gana consistentemente, no sirve
+- **Urgencia**: Necesito un sistema que realmente funcione, no uno teórico
+
+## Funcionalidades Requeridas del Sistema
+
+### 1. Interfaz de Usuario
+```
+- Selector de competiciones (Liga, Champions, Premier League, etc.)
+- Selector de partidos específicos dentro de la competición
+- Visualización clara de las recomendaciones con nivel de confianza
+- Opciones para ver apuestas individuales o combinadas
+```
+
+### 2. Mercados de Apuestas a Analizar
+El sistema debe analizar y recomendar en estos mercados principales:
+
+**Mercados Obligatorios:**
+- **Ganador del partido** (1X2)
+- **Ambos equipos marcan** (BTTS - Both Teams To Score)
+- **Total de goles** (Over/Under 2.5, 1.5, 3.5)
+- **Goles por equipo** (Over/Under goles local/visitante)
+- **Resultado exacto** (scorecasts de alta probabilidad)
+- **Primer goleador / Goleador en cualquier momento**
+- **Tiros a puerta** (Over/Under por equipo)
+- **Córners** (total y por equipo)
+- **Tarjetas amarillas/rojas**
+- **Hándicap asiático**
+- **Doble oportunidad**
+
+### 3. Sistema de Recomendación Inteligente
+Necesito que el sistema:
+- **Identifique las apuestas de mayor valor** (value bets) basándose en probabilidades reales vs cuotas
+- **Calcule niveles de confianza** (Alta/Media/Baja) para cada predicción
+- **Sugiera combinadas óptimas** maximizando probabilidad vs retorno
+- **Filtre por umbral de confianza** (ej: solo mostrar predicciones >70% confianza)
+
+## Arquitectura Técnica Esperada
+
+### Módulo 1: Data Collection (APIs + Web Scraping)
+```python
+# PRIORIDAD 1: APIs (ya tengo acceso)
+- Football-Data.org API: estadísticas, partidos, clasificaciones
+- The Odds API: cuotas en tiempo real, múltiples bookmakers
+
+# PRIORIDAD 2: Web Scraping (solo para datos complementarios)
+- Datos adicionales no disponibles en APIs
+- Estadísticas avanzadas (xG detallado, heat maps, etc.)
+- Información de lesiones/suspensiones actualizadas
+- Clima y factores externos
+
+# Arquitectura:
+- Rate limiting inteligente para ambas APIs
+- Sistema de cache (Redis) para reducir llamadas
+- Fallback a scraping si APIs fallan
+- Sincronización de datos cada X minutos
+```
+
+### Módulo 2: Motor de Análisis Predictivo
+Debe incluir:
+- **Feature Engineering avanzado** con 50+ features:
+  ```python
+  # Features básicos:
+  - Forma reciente (EMA de resultados)
+  - xG esperados vs reales
+  - Posesión efectiva
+  - Tiros a puerta por partido
+  - Conversion rate
+  
+  # Features avanzados:
+  - Elo rating dinámico
+  - Poisson distribution para goles
+  - Forma ajustada por calidad de rival
+  - Fatiga (días de descanso, partidos jugados)
+  - Momentum (racha de resultados)
+  - Home advantage ajustado por estadio
+  - Motivación (objetivos de temporada)
+  
+  # Features de mercado:
+  - Análisis de movimiento de líneas
+  - Volumen de apuestas por mercado
+  - Discrepancia entre bookmakers
+  - Sharp money indicators
+  ```
+
+- **Ensemble de modelos ML**:
+  ```python
+  1. Modelo base (Poisson Regression) para goles
+  2. XGBoost para probabilidad de resultado
+  3. LightGBM para mercados específicos
+  4. Neural Network para patterns complejos
+  5. Meta-model que combina predicciones
+  
+  # Cada modelo debe tener:
+  - Cross-validation rigurosa
+  - Feature importance analysis
+  - Calibración de probabilidades
+  - Confidence intervals
+  ```
+
+- **Sistema de Kelly Criterion** para sizing de apuestas:
+  ```python
+  # No apostar flat, usar Kelly modificado:
+  - Calcular edge real vs bookmaker
+  - Aplicar Kelly Criterion con factor de seguridad (0.25-0.5)
+  - Límite máximo de bankroll por apuesta (2-5%)
+  - Ajuste dinámico según racha ganadora/perdedora
+  ```
+
+### Módulo 3: Generador de Recomendaciones
+```python
+# Output esperado por partido:
+{
+  "partido": "Real Madrid vs Barcelona",
+  "competicion": "La Liga",
+  "fecha": "2024-12-01",
+  "recomendaciones_individuales": [
+    {
+      "mercado": "Over 2.5 goles",
+      "prediccion": "Sí",
+      "confianza": "85%",
+      "cuota_promedio": 1.75,
+      "razon": "Ambos equipos promedian 3+ goles en últimos 5 partidos..."
+    },
+    {
+      "mercado": "Ambos marcan",
+      "prediccion": "Sí",
+      "confianza": "78%",
+      "cuota_promedio": 1.60,
+      "razon": "..."
+    }
+  ],
+  "combinadas_sugeridas": [
+    {
+      "mercados": ["Over 2.5", "Ambos marcan"],
+      "cuota_combinada": 2.80,
+      "probabilidad_conjunta": "66%",
+      "valor_esperado": "positivo"
+    }
+  ],
+  "mejor_apuesta_valor": {
+    "mercado": "Over 2.5 goles",
+    "edge": "12%"  # ventaja sobre la casa
+  }
+}
+```
+
+## Estrategias de Maximización de Aciertos
+
+Por favor ayúdame a implementar estas estrategias CRÍTICAS:
+
+### 1. **Filtrado Inteligente - Solo apuestas de alto valor**
+```python
+Criterios mínimos para recomendar una apuesta:
+- Edge sobre bookmaker > 5%
+- Nivel de confianza del modelo > 70%
+- Probabilidad implícita vs real divergence > 8%
+- Consenso entre múltiples modelos
+- Muestra suficiente de datos históricos
+- Evitar mercados con alta varianza (scorecasts exactos)
+```
+
+### 2. **Especialización por Liga y Mercado**
+```python
+# El sistema debe identificar automáticamente:
+- ¿En qué ligas tengo mejor performance? (train vs test)
+- ¿Qué mercados predigo mejor? (1X2 vs BTTS vs O/U)
+- ¿Qué equipos entiendo mejor?
+- ¿Qué rangos de cuotas son más rentables? (favoritos vs underdogs)
+
+# Entonces enfocar recomendaciones en áreas fuertes
+```
+
+### 3. **Análisis de Líneas Cerradas (Closing Line Value)**
+```python
+# CRÍTICO: Validar contra línea de cierre
+- Registrar cuotas 24h antes del partido
+- Comparar con cuotas de cierre (minutos antes)
+- Si consistentemente predigo peor que línea de cierre = modelo malo
+- Objetivo: beat closing line en 55%+ de casos
+```
+
+### 4. **Gestión de Bankroll Kelly Criterion**
+```python
+# Tamaño de apuesta dinámico:
+kelly_fraction = (edge * probability - (1 - probability)) / edge
+safe_kelly = kelly_fraction * 0.25  # Factor conservador
+
+# Límites de seguridad:
+- Máximo 3-5% del bankroll por apuesta
+- Máximo 15% expuesto simultáneamente
+- Reducir stakes después de rachas negativas
+```
+
+### 5. **Backtesting Riguroso**
+```python
+# Validación histórica OBLIGATORIA:
+- Mínimo 500 partidos de histórico
+- Walk-forward validation (no data leakage)
+- Calcular métricas reales:
+  * Win rate por mercado
+  * ROI por tipo de apuesta
+  * Sharpe Ratio
+  * Maximum drawdown
+  * Longest losing streak
+  
+# Solo usar en producción si backtest muestra:
+- Win rate > 55% en apuestas recomendadas
+- ROI > 5% sostenido
+- Sharpe Ratio > 1.0
+```
+
+### 6. **Detección de Arbitraje y Value Bets**
+```python
+# Aprovechar discrepancias entre bookmakers:
+- Comparar odds de 5+ bookmakers (The Odds API)
+- Identificar outliers (bookmaker que paga mucho más)
+- Calcular probabilidad implícita promedio
+- Apostar cuando: mi_probabilidad > promedio_mercado + threshold
+```
+
+### 7. **Análisis de Correlación para Combinadas**
+```python
+# NO hacer combinadas con eventos correlacionados:
+- "Over 2.5" + "Ambos marcan" = correlacionados
+- "Equipo A gana" + "Goleador de A" = correlacionados
+
+# Buscar combinadas con eventos independientes:
+- Diferentes partidos
+- Diferentes ligas
+- Mercados no relacionados
+
+# Calcular probabilidad real conjunta considerando correlación
+```
+
+## Stack Tecnológico Recomendado
+
+```
+- Python 3.8+
+- Scraping: Selenium + BeautifulSoup + Scrapy
+- Data: Pandas, NumPy
+- ML: Scikit-learn, XGBoost
+- Base de datos: PostgreSQL o MongoDB
+- API: FastAPI para backend
+- Frontend: React o Streamlit para interfaz simple
+```
+
+## Lo que Necesito de Ti PASO A PASO
+
+1. **Arquitectura completa del sistema** con diagrama de flujo
+2. **Identificación de las mejores fuentes de datos** (incluyendo APIs si existen)
+3. **Código funcional de scrapers** robustos y probados
+4. **Modelo predictivo** con métricas de performance (accuracy, precision, recall)
+5. **Sistema de recomendaciones** con explicaciones de cada predicción
+6. **Interfaz de usuario** intuitiva para selección y visualización
+7. **Scripts de backtesting** para validar efectividad histórica
+
+## Requisitos Críticos de Éxito
+
+### Métricas de Performance Obligatorias:
+
+✅ **Win Rate**: Mínimo 60% en apuestas recomendadas (verificado en backtest)
+✅ **ROI**: Mínimo +5% sostenido sobre 100+ apuestas
+✅ **Sharpe Ratio**: > 1.0 (retorno ajustado por riesgo)
+✅ **Closing Line Value**: Beat closing line en 55%+ casos
+✅ **Maximum Drawdown**: < 20% del bankroll inicial
+✅ **Explicabilidad**: Cada predicción con justificación basada en datos
+✅ **Escalabilidad**: Funcionar con 5+ ligas simultáneamente
+✅ **Latencia**: Predicciones en < 2 segundos
+
+### Dashboard de Monitoreo en Tiempo Real:
+```
+El sistema DEBE incluir dashboard que muestre:
+- Win rate actual vs esperado
+- ROI acumulado por periodo
+- Performance por liga/mercado
+- Gráfico de bankroll evolution
+- Longest winning/losing streak
+- Próximas apuestas recomendadas con confidence
+- Alertas cuando performance cae bajo umbrales
+```
+
+### Sistema de Logging y Auditoría:
+```python
+# Registrar TODO para análisis posterior:
+- Cada predicción realizada con timestamp
+- Features usadas y sus valores
+- Output de cada modelo
+- Cuotas en momento de predicción vs cierre
+- Resultado real del partido
+- P&L de la apuesta
+- Reasoning del sistema
+
+# Para poder hacer:
+- Post-mortem de predicciones fallidas
+- Identificar biases del modelo
+- Optimizar continuamente
+```
+
+## Stack Tecnológico Profesional Requerido
+
+**IMPORTANTE**: Necesito un stack de nivel PROFESIONAL/ENTERPRISE, nada básico. El sistema debe ser escalable, mantenible y seguir las mejores prácticas de la industria.
+
+### Backend
+```
+- Python 3.11+ con Type Hints estrictos
+- FastAPI (async/await para alto rendimiento)
+- Celery + Redis para tareas asíncronas y colas
+- PostgreSQL (datos estructurados) + TimescaleDB (series temporales)
+- MongoDB (datos no estructurados de scraping)
+- SQLAlchemy 2.0 (ORM con async support)
+- Pydantic V2 para validación de datos
+- Alembic para migraciones de BD
+```
+
+### Scraping & Data Collection
+```
+- Scrapy (framework profesional de scraping)
+- Playwright (scraping de sitios con JavaScript)
+- BeautifulSoup4 + lxml (parsing rápido)
+- Proxy rotation con Scrapy-Rotating-Proxies
+- Redis para cache y rate limiting
+```
+
+### Machine Learning & Analytics
+```
+- Scikit-learn (modelos base)
+- XGBoost / LightGBM (gradient boosting)
+- TensorFlow o PyTorch (deep learning si es necesario)
+- Pandas + Polars (manipulación de datos)
+- NumPy para operaciones numéricas
+- Scipy para estadísticas avanzadas
+- MLflow para tracking de experimentos
+```
+
+### Frontend
+```
+- React 18+ con TypeScript
+- Next.js 14 (SSR y optimización) - NO Streamlit
+- TailwindCSS + shadcn/ui (diseño profesional)
+- React Query para manejo de estado servidor
+- Recharts o D3.js para visualizaciones
+- Zustand o Redux Toolkit para estado global
+```
+
+**IMPORTANTE SOBRE FRONTEND**: 
+- ❌ NO usar Streamlit (no es profesional ni escalable para producción)
+- ✅ Usar Next.js + React para stack moderno y profesional
+- Si hay limitaciones de tiempo, priorizar backend/ML y usar shadcn/ui para UI rápida pero profesional
+
+### Infrastructure & DevOps
+```
+- Docker + Docker Compose (containerización)
+- Kubernetes (opcional si necesitas escalamiento)
+- Nginx (reverse proxy y load balancing)
+- GitHub Actions o GitLab CI/CD
+- Sentry (error tracking)
+- Prometheus + Grafana (monitoreo)
+```
+
+### Testing
+```
+- Pytest (backend testing)
+- Jest + React Testing Library (frontend)
+- Locust o k6 (load testing)
+- Coverage.py para cobertura de código
+```
+
+## Estructura de Carpetas con Screaming Architecture
+
+**REQUISITO CRÍTICO**: Necesito una estructura que siga **Screaming Architecture** y **Clean Architecture**. La estructura debe GRITAR lo que hace el sistema (predicción de apuestas deportivas), no la tecnología usada.
+
+Proporcióname una estructura completa con:
+- Separación clara de capas (Domain, Application, Infrastructure, Presentation)
+- Organización por features/casos de uso, NO por tipo técnico
+- Independencia de frameworks
+- Facilidad para testing
+- Escalabilidad horizontal
+
+### Ejemplo de lo que NECESITO:
+
+```
+betting-predictor/
+├── src/
+│   ├── prediction/                    # FEATURE: Predicción de apuestas
+│   │   ├── domain/                    # Lógica de negocio pura
+│   │   │   ├── entities/
+│   │   │   ├── value_objects/
+│   │   │   ├── repositories/
+│   │   │   └── services/
+│   │   ├── application/               # Casos de uso
+│   │   │   ├── use_cases/
+│   │   │   ├── dtos/
+│   │   │   └── ports/
+│   │   └── infrastructure/            # Implementaciones técnicas
+│   │       ├── ml_models/
+│   │       ├── repositories/
+│   │       └── adapters/
+│   ├── scraping/                      # FEATURE: Recolección de datos
+│   ├── odds_analysis/                 # FEATURE: Análisis de cuotas
+│   ├── match_selection/               # FEATURE: Selección de partidos
+│   └── recommendation/                # FEATURE: Sistema de recomendaciones
+├── tests/
+├── docs/
+└── infrastructure/
+```
+
+## Lo que DEBES Proporcionarme
+
+### 1. Integración Completa de las APIs
+**CRÍTICO**: Dame ejemplos de código COMPLETO Y FUNCIONAL para integrar ambas APIs:
+- Autenticación y configuración de headers con manejo de errores
+- Endpoints específicos a usar para cada feature
+- Estructura de las respuestas (schemas con Pydantic)
+- Manejo robusto de rate limits y errores (retry logic, exponential backoff)
+- Sistema de cache con Redis (TTL por tipo de dato)
+- Cómo combinar datos de ambas APIs eficientemente
+- Parsers para transformar respuestas en features ML
+- Tests unitarios para cada integrador
+
+### 2. Feature Engineering Detallado
+**REQUISITO**: Dame la lista COMPLETA de features (50+) que debo calcular:
+- Fórmulas matemáticas exactas para cada feature
+- Librerías Python a usar para cálculos
+- Cómo normalizar/escalar cada feature
+- Feature importance esperado de cada uno
+- Ejemplos de código para calcular top 10 features más importantes
+
+### 3. Pipeline ML Completo
+**NECESITO**:
+- Código de entrenamiento de modelos con hyperparameter tuning
+- Cross-validation strategy (TimeSeriesSplit)
+- Feature selection automatizado
+- Model ensembling (stacking/blending)
+- Calibración de probabilidades (Platt scaling)
+- Serialización de modelos (joblib/pickle)
+- Scripts de reentrenamiento periódico
+
+### 4. Stack Tecnológico Justificado
+Explica POR QUÉ cada tecnología del stack es la mejor opción para este proyecto específico. No quiero solo una lista, necesito:
+- Justificación técnica de cada elección
+- Alternativas consideradas y por qué fueron descartadas
+- Cómo cada pieza se integra con el sistema completo
+
+### 5. Estructura de Carpetas Completa
+Dame la estructura COMPLETA del proyecto con:
+- Todos los directorios y subdirectorios principales
+- Archivos clave en cada directorio
+- Breve descripción de qué va en cada carpeta
+- Cómo se relacionan las capas entre sí
+- Patrones de diseño aplicados (Repository, Factory, Strategy, etc.)
+
+### 6. Diagrama de Arquitectura
+Proporciona un diagrama de arquitectura (en formato Mermaid o texto) que muestre:
+- Flujo de datos completo
+- Capas del sistema
+- Comunicación entre componentes
+- Integraciones externas (APIs, scraping targets, etc.)
+
+### 9. Setup del Proyecto
+Incluye:
+- Archivos de configuración (docker-compose.yml, pyproject.toml, package.json, etc.)
+- Variables de entorno necesarias
+- Scripts de inicialización
+- Instrucciones de deploy
+
+## 🚨 CONSIDERACIONES FINALES CRÍTICAS
+
+### Realismo vs Optimismo
+```
+SÉ HONESTO EN TUS RECOMENDACIONES:
+
+✅ Hazme saber si algo es muy difícil de lograr
+✅ Advierte sobre overfitting y data leakage
+✅ Explica limitaciones del approach
+✅ Dame expectativas REALISTAS de win rate (no prometas 80%+)
+✅ Menciona que ningún sistema gana siempre
+
+❌ No me des código que "debería funcionar" sin probarlo
+❌ No asumas que más complejidad = mejor performance
+❌ No ignores el hecho de que bookmakers son sofisticados
+```
+
+### Entregables Mínimos Viables
+
+**Para que el proyecto sea exitoso, NECESITO como mínimo**:
+
+1. ✅ Sistema funcional que haga predicciones automatizadas
+2. ✅ Backtesting que demuestre win rate >55% en test set
+3. ✅ Dashboard para visualizar recomendaciones
+4. ✅ Logging de todas las decisiones para auditoría
+5. ✅ Documentación clara de cómo usar el sistema
+6. ✅ Scripts de deployment (Docker)
+7. ✅ Tests automatizados (coverage >70%)
+
+### Red Flags a Evitar
+
+```python
+❌ "Este modelo tendrá 90% accuracy" - UNREALISTIC
+❌ Entrenar solo con victorias del favorito - BIAS
+❌ No validar con walk-forward - DATA LEAKAGE
+❌ Ignorar transaction costs (comisiones) - WRONG ROI
+❌ No considerar market efficiency - OVERCONFIDENT
+❌ Combinar odds de diferentes momentos - SURVIVOR BIAS
+❌ No tener stop-loss en rachas negativas - BANKRUPT
+```
+
+### Pregunta de Validación
+
+**Antes de empezar a codear, respóndeme**:
+```
+1. ¿Es realista esperar 60%+ win rate con este approach?
+2. ¿Cuáles son los 3 riesgos principales del sistema?
+3. ¿Qué haría si el backtesting muestra 52% win rate en vez de 65%?
+4. ¿Cómo valido que no hay data leakage?
+5. ¿Cuántos datos históricos mínimos necesito?
+```
+
+**Dame la integración completa de Football-Data API + The Odds API + el stack tecnológico profesional COMPLETO con justificaciones + la estructura de carpetas siguiendo Screaming Architecture + el diagrama de arquitectura del sistema + ejemplos de código para conectar las APIs. Quiero empezar a implementar esto inmediatamente con las mejores prácticas de la industria.**
+
+**Mis API Keys:**
+- Football-Data: `3e45363c9c074c9d9254a155d6f89020`
+- The Odds API: `aa55ec5be4748f07a76766ac6f1efc19`
+
+---
+
+*Nota: Este es un proyecto serio que será evaluado por efectividad real. Necesito arquitectura enterprise-grade con integración robusta de las APIs disponibles.*
