@@ -14,17 +14,223 @@ Enterprise-grade sports betting intelligence platform with machine learning pred
 
 ## Architecture
 
-The project follows **Screaming Architecture** and **Clean Architecture** principles:
+The project follows **Screaming Architecture** and **Clean Architecture** principles, organizing code by business features rather than technical layers.
+
+### System Architecture Overview
+
+```mermaid
+graph TB
+    subgraph "External Data Sources"
+        FD[Football-Data.org API]
+        OA[The Odds API]
+    end
+    
+    subgraph "Data Collection Layer"
+        FDC[Football Data Client]
+        OAC[Odds API Client]
+        RC[Redis Cache]
+        FDC --> RC
+        OAC --> RC
+    end
+    
+    subgraph "Data Storage Layer"
+        PG[(PostgreSQL + TimescaleDB)]
+        MG[(MongoDB)]
+        RC --> PG
+        RC --> MG
+    end
+    
+    subgraph "Feature Engineering Layer"
+        BF[Basic Features]
+        AF[Advanced Features]
+        MF[Market Features]
+        FP[Feature Pipeline]
+        BF --> FP
+        AF --> FP
+        MF --> FP
+    end
+    
+    subgraph "ML Prediction Layer"
+        PM[Poisson Model]
+        XG[XGBoost Model]
+        LG[LightGBM Model]
+        EM[Ensemble Meta-Model]
+        PM --> EM
+        XG --> EM
+        LG --> EM
+    end
+    
+    subgraph "Business Logic Layer"
+        VB[Value Bet Detector]
+        KC[Kelly Calculator]
+        PO[Parlay Optimizer]
+        RE[Recommendation Engine]
+        VB --> RE
+        KC --> RE
+        PO --> RE
+    end
+    
+    subgraph "API Layer"
+        FA[FastAPI Backend]
+        RE --> FA
+    end
+    
+    subgraph "Presentation Layer"
+        NX[Next.js Frontend]
+        FA --> NX
+    end
+    
+    FD --> FDC
+    OA --> OAC
+    PG --> FP
+    MG --> FP
+    FP --> PM
+    FP --> XG
+    FP --> LG
+    EM --> VB
+```
+
+### Data Flow Diagram
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Frontend
+    participant API
+    participant Cache
+    participant DataCollector
+    participant FeatureEngine
+    participant MLModels
+    participant Recommender
+    participant DB
+    
+    User->>Frontend: Select Competition
+    Frontend->>API: GET /matches/upcoming
+    API->>Cache: Check cache
+    alt Cache Hit
+        Cache-->>API: Return cached data
+    else Cache Miss
+        API->>DataCollector: Fetch matches
+        DataCollector->>DB: Query stored data
+        DataCollector->>Cache: Store in cache
+        DataCollector-->>API: Return matches
+    end
+    API-->>Frontend: Match list
+    
+    User->>Frontend: Select Match
+    Frontend->>API: GET /predictions/{matchId}
+    API->>FeatureEngine: Calculate features
+    FeatureEngine->>DB: Get historical data
+    FeatureEngine-->>MLModels: Feature vector
+    MLModels->>MLModels: Run ensemble
+    MLModels-->>Recommender: Probabilities
+    Recommender->>Recommender: Detect value bets
+    Recommender->>Recommender: Calculate Kelly stakes
+    Recommender-->>API: Recommendations
+    API->>DB: Log prediction
+    API-->>Frontend: Prediction results
+    Frontend-->>User: Display recommendations
+```
+
+### Clean Architecture Layers
+
+The system is organized into 4 distinct layers following Clean Architecture principles:
+
+```mermaid
+graph LR
+    subgraph "Domain Layer - Pure Business Logic"
+        E[Entities]
+        VO[Value Objects]
+        DR[Domain Repositories]
+        DS[Domain Services]
+    end
+    
+    subgraph "Application Layer - Use Cases"
+        UC[Use Cases]
+        DTO[DTOs]
+        P[Ports/Interfaces]
+    end
+    
+    subgraph "Infrastructure Layer - Technical Details"
+        API[API Clients]
+        REPO[Repository Implementations]
+        ML[ML Models]
+        CACHE[Cache]
+        DB[Database]
+    end
+    
+    subgraph "Presentation Layer - UI"
+        REST[REST API]
+        WEB[Web Frontend]
+    end
+    
+    UC --> DR
+    UC --> DS
+    REPO -.implements.-> DR
+    API --> P
+    ML --> P
+    REST --> UC
+    WEB --> REST
+    REPO --> DB
+    API --> CACHE
+```
+
+**Layer Descriptions:**
+
+1. **Domain Layer** (Innermost - No Dependencies)
+   - Pure business logic independent of frameworks
+   - Entities: Match, Team, Prediction, Bet
+   - Value Objects: Odds, Probability, Confidence
+   - No external dependencies, no database code, no API calls
+
+2. **Application Layer** (Use Cases)
+   - Orchestrates domain logic for specific use cases
+   - Use Cases: PredictMatchUseCase, GenerateRecommendationsUseCase
+   - DTOs for input/output
+   - Defines interfaces (ports) for infrastructure
+
+3. **Infrastructure Layer** (Technical Implementation)
+   - Implements technical details and external integrations
+   - API Clients: Football-Data.org, The Odds API
+   - ML Models: XGBoost, Poisson, Ensemble
+   - Database: PostgreSQL, MongoDB, Redis
+
+4. **Presentation Layer** (UI/API)
+   - Handles user interaction
+   - FastAPI REST endpoints
+   - Next.js web application
+
+### Project Structure
 
 ```
-src/
-├── prediction/          # Match prediction feature
-├── data_collection/     # API integration and data fetching
-├── feature_engineering/ # Feature calculation (50+ features)
-├── recommendation/      # Value bet detection and Kelly Criterion
-├── backtesting/         # Historical validation
-├── api/                 # FastAPI REST API
-└── shared/              # Common utilities
+sports-betting-predictor/
+├── src/
+│   ├── prediction/          # FEATURE: Match Prediction
+│   │   ├── domain/          # Business logic
+│   │   ├── application/     # Use cases
+│   │   └── infrastructure/  # ML models
+│   ├── data_collection/     # FEATURE: Data Collection
+│   │   ├── domain/          # Data entities
+│   │   ├── application/     # Fetch use cases
+│   │   └── infrastructure/  # API clients
+│   ├── feature_engineering/ # FEATURE: Feature Engineering
+│   │   ├── domain/          # Feature definitions
+│   │   ├── application/     # Calculation use cases
+│   │   └── infrastructure/  # Calculators
+│   ├── recommendation/      # FEATURE: Bet Recommendations
+│   │   ├── domain/          # Value bet logic
+│   │   ├── application/     # Recommendation use cases
+│   │   └── infrastructure/  # Analyzers
+│   ├── backtesting/         # FEATURE: Backtesting
+│   │   ├── domain/          # Backtest logic
+│   │   ├── application/     # Validation use cases
+│   │   └── infrastructure/  # Validators
+│   ├── api/                 # PRESENTATION: REST API
+│   └── shared/              # SHARED: Common utilities
+├── frontend/                # PRESENTATION: Web UI
+├── tests/                   # Test suite
+├── infrastructure/          # Docker configs
+└── docs/                    # Documentation
 ```
 
 ## Tech Stack
