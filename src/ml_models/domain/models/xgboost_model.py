@@ -1,17 +1,3 @@
-Está muy bien encaminado, pero tiene 3 detallitos importantes que yo corregiría para dejarlo fino:
-
-early_stopping_rounds no se usa en fit (ahora mismo es parámetro “decorativo”).
-
-StandardScaler y numpy no se usan en ningún lado → se pueden borrar.
-
-En load, creas XGBClassifier() vacío y luego cargas el modelo. Funciona, pero:
-
-Pierdes la configuración explícita (tree_method='hist', objective, etc.) que tenías en el __init__.
-
-Ya tienes una instancia creada con los parámetros de metadata['params'], lo más limpio es no reemplazar instance.model, solo llamar a load_model sobre él.
-
-Te dejo tu clase con cambios mínimos y comentados (sin cambiar tu diseño):
-
 """
 XGBoost Model
 
@@ -113,7 +99,7 @@ class XGBoostModel:
         
         fit_kwargs = {"verbose": verbose}
 
-        # ✅ Usa early stopping solo si hay validación
+        # Use early stopping only if validation set is provided
         if X_val is not None and y_val is not None:
             fit_kwargs["eval_set"] = [(X_val, y_val)]
             fit_kwargs["early_stopping_rounds"] = early_stopping_rounds
@@ -260,24 +246,10 @@ class XGBoostModel:
         # Create instance with same params
         instance = cls(**metadata["params"])
         
-        # ✅ No re-crear XGBClassifier, solo cargar sobre el ya configurado
+        # Load model weights into already configured XGBClassifier
         instance.model.load_model(filepath)
         instance.is_fitted = True
         instance.feature_names = metadata["feature_names"]
         
         logger.info(f"Model loaded from {filepath}")
         return instance
-
-En resumen
-
-Tu versión está bien y funciona.
-
-Con estos cambios:
-
-Aprovechas de verdad early_stopping_rounds.
-
-Limpias imports muertos.
-
-load queda más consistente con tu __init__ y con los parámetros guardados.
-
-Si quieres, luego vemos cómo integrarlo en tu módulo match_analysis (por ejemplo, un XGBoostMatchPredictor que reciba un Match de dominio y lo transforme en vector de features para este modelo).
