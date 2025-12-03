@@ -1,0 +1,391 @@
+1. Quick wins (hacer ya — máximo impacto, mínimo coste)
+
+Calibración global del modelo
+
+Qué: CalibratedClassifierCV (isotonic/sigmoid) sobre XGB prefit.
+
+Por qué: convierte predicciones a probabilidades reales → hace posible value betting.
+
+Cómo: scripts/calibrate_model.py → guarda models/calib_global.pkl.
+
+Tests: test_calibrator_predict_shape, brier/logloss mejoran en val.
+
+Métricas: Brier ↓, LogLoss ↓, EV-by-bin claro.
+
+EV-by-bin analysis y decision rules
+
+Qué: script que agrupa por bins de prob (5%) y calcula actual_win_rate, avg_implied_prob, edge.
+
+Por qué: encuentra sweet spot (p.ej. prob ≥ 0.50).
+
+Cómo: scripts/analyze_ev_bins.py → CSV + heatmap.
+
+Tests: reproducible on subset.
+
+Move odds features to inference only
+
+Qué: remove odds-derived columns from training features; compute them vectorized in backtest/predict step.
+
+Por qué: evita data leakage.
+
+Cómo: in backtest_new_model.py compute imp = 1/odds, norm, margin.
+
+Tests: ensure training X doesn't contain odds.
+
+2. Dataset & Feature Engineering (core)
+
+FeaturePipeline robusto
+
+Qué: class FeaturePipeline that loads historical data once, computes and caches ELO, rolling stats, H2H, poisson lambdas.
+
+Inputs/Outputs: input historical parquet; batch_transform(matches_df) returns features DF aligned.
+
+Files: src/feature_engineering/pipeline.py, calculators/{elo.py,form.py,h2h.py,poisson.py}.
+
+Tests: test_feature_pipeline_batch_transform, property tests (len==in).
+
+Perf: vectorized, cache parquet, complete nightly < 5 min.
+
+ELO ratings (improved)
+
+Qué: incremental ELO per match, home_adv param, K per league.
+
+Por qué: top predictor.
+
+Tests: known sequences produce expected deltas.
+
+Forma vectorizada (last N matches)
+
+Qué: rolling windows features: pts_last5, gf_last5, ga_last5, versions home/away.
+
+Por qué: momentum; helps away/draw.
+
+Tests: correct for seasons boundaries.
+
+H2H advanced
+
+Qué: last 5 H2H metrics: wins/draws/avg_goals, %BTTS, %over2.5.
+
+Tests: aggregated vs raw.
+
+Poisson / xG approximations
+
+Qué: estimate lambdas per team & poisson probs for 1X2.
+
+Por qué: good probabilistic baseline features.
+
+Tests: probabilities sum ~1, sensible lambdas.
+
+Odds features (inference/backtest only)
+
+Qué: imp_h, imp_d, imp_a, norm_h,...,book_margin,odds_ratios.
+
+Por qué: market signal for value.
+
+Tests: vectorized calc; no leakage in train.
+
+3. Modeling improvements
+
+Sample weights / class balancing
+
+Qué: compute sample_weight using compute_class_weight('balanced') or custom.
+
+Por qué: improve F1 draw/away.
+
+Tests: F1 per class increases.
+
+Two-stage model (optional)
+
+Qué: stage1: Home vs NotHome; stage2: Draw vs Away for not-home.
+
+Por qué: specialize and improve draw predictions.
+
+Tests: stage metrics and end-to-end accuracy.
+
+Try alternatives & HPO (LightGBM/CatBoost + Optuna)
+
+Qué: experiments with Optuna; limit budget.
+
+Por qué: +1–2% possible.
+
+Tests: track via MLflow or metadata; reproducibility.
+
+Feature selection & regularization
+
+Qué: SHAP, permutation importance; remove unstable features.
+
+Por qué: reduce overfitting, better stability per window.
+
+Tests: ablation impacts.
+
+4. Calibration orchestration
+
+CalibratorManager (global + champions)
+
+Qué: manager class that fits global calibrator and per-league calibrators only if n_samples >= MIN (e.g. 300). Lazy load and on-disk joblib.
+
+Interface: fit_global(), fit_by_league(), predict_proba(league, X).
+
+Tests: test_fallback_to_global, test_league_calib_applies.
+
+Files: src/models/calibrator_manager.py.
+
+Meta-calibrator (optional)
+
+Qué: combine global and league calibrator via weighted average p = α*p_global + (1-α)*p_league where α determined by val.
+
+Tests: improvement in brier.
+
+5. Backtesting & staking
+
+EnhancedBacktester (done) — extend
+
+Qué: already have slippage & strategies; ensure trades_df with full audit fields.
+
+Add per-bet caps, daily cap, rejection handling.
+
+Tests: unit tests and integration simulation.
+
+StakeStrategy classes (done) — add volatility cap
+
+Qué: Kelly fractional limited (cap by volatility), max-per-bet %, daily caps.
+
+Files: src/backtesting/stake_strategies.py.
+
+Tests: Kelly math, cap enforcement.
+
+Grid search for thresholds (automated)
+
+Qué: run grid over (min_conf, min_edge, odds_range) and save heatmap results.
+
+Por qué: find volume/ROI sweet spots (move 15→40–60 bets).
+
+Files: scripts/grid_filters.py.
+
+Tests: reproducibility.
+
+Slippage & book margin modelling
+
+Qué: realistic slippage model; implement conservative scenarios ±2–5% odds shift.
+
+Tests: sensitivity analysis.
+
+6. Validation & robustness
+
+Walk-forward validation (rolling windows)
+
+Qué: script scripts/walk_forward.py to run N temporal folds, saving model, calibrator, metrics per fold.
+
+Por qué: essential to validate temporal generalization.
+
+Tests: ensure splits have no leakage.
+
+Backtest per league / per season
+
+Qué: metrics grouped by league and season; detect weak leagues.
+
+Tests: generate CSVs & plots.
+
+Paper-trading simulator
+
+Qué: dry-run against live odds feed simulating fills and slippage; store trades.
+
+Por qué: validate execution behaviour.
+
+7. Pipeline, infra & deployment
+
+Feature store & ETL jobs
+
+Qué: store precomputed aggregates in Parquet partitioned by season/league; nightly ETL job.
+
+Files: /data/processed/..., scripts/run_etl.sh.
+
+Perf: nightly < 5 min.
+
+Containerize & scheduler
+
+Qué: Docker multi-stage, docker-compose or Airflow DAG for nightly jobs.
+
+Files: Dockerfile, docker-compose.yml, dags/pipeline_dag.py.
+
+Tests: smoke container run.
+
+CI/CD improvements
+
+Qué: lint → tests → build → run integration → publish artifact. Fix failing lint.
+
+Files: .github/workflows/ci.yml.
+
+Tests: maintain 80%+ coverage.
+
+Connector for bookmakers
+
+Qué: adapters for bookie APIs with dry-run and live modes. Handle retries, rate limits.
+
+Tests: mock APIs; test order flow.
+
+8. Monitoring, alerting & ops
+
+Dashboard metrics & daily queries
+
+Qué: Brier, LogLoss, ROI rolling 7/30/90, EV-by-bin, fill rate.
+
+Implement queries and visualizations (Grafana / Plotly).
+
+Files: queries/*.sql, dashboards/.
+
+Alert rules & runbook
+
+Qué: critical alerts: rolling 30d ROI < -5%, fill rate < 70%, daily job failure.
+
+Files: alert_rules.yaml, runbook.md.
+
+Tests: simulate alerts.
+
+Drift detection & retrain trigger
+
+Qué: daily compute Wasserstein/KL for top features; retrain when threshold and logloss degrade.
+
+Files: scripts/retrain_trigger.py.
+
+Tests: synthetic drift.
+
+Logging & reconciliation
+
+Qué: structured JSON logs for every signal and trade; daily reconciliation job comparing expected vs executed.
+
+Files: logs/, scripts/reconcile_trades.py.
+
+9. Governance, tests & quality
+
+Model registry & metadata
+
+Qué: models/{version}/metadata.json with git_sha, data_range, metrics. MLflow optional.
+
+Tests: metadata completeness.
+
+Extensive tests & CI
+
+Qué: unit tests for calibrator, backtester, stake strategies; integration tests end-to-end with small dataset.
+
+Goal: 80%+ coverage in critical modules.
+
+Code quality
+
+Qué: type hints, mypy, black, isort, pre-commit, lint. Fix existing lint failing job.
+
+Tests: CI runs lint.
+
+10. Risk management & live rollout
+
+Phased rollout plan
+
+Phase A: dry-run / micro stakes 0.5% bankroll (7–14d).
+
+Phase B: scale to 2% if criteria met (14–28d).
+
+Phase C: up to 5% if stable.
+
+Files: deploy/runbook_rollout.md.
+
+Staking policy & caps
+
+Kelly fractional × 0.25, max stake 1–2% bankroll, daily cap 6%, stop-loss daily 5%.
+
+Implement in StakeStrategy.
+
+Regulatory & accounting
+
+Qué: store trade logs, compute taxable reports, consult local rules.
+
+11. Advanced / R&D (after stable)
+
+Ensembles & stacking
+
+Implement LightGBM/CatBoost/MLP + stacking meta-model. Use OOF preds.
+
+Tests: validate via walk-forward.
+
+Per-league models (if enough data)
+
+Train league-specific models for leagues with enough history (>5k matches).
+
+Tests: per-league holdouts.
+
+In-play (high infra cost)
+
+Research only until infra ready: sub-second inference & live odds feed.
+
+Auto retrain / schedule
+
+Retrain monthly or on drift triggers; automated promotion path with tests.
+
+12. Documentation & runbooks (must-have)
+
+README, QuickStart, Feature docs
+
+Runbook emergency + pause deploy
+
+Model cards & changelog
+
+PR template + release checklist
+
+13. Concrete filenames & PRs to create now
+
+src/feature_engineering/pipeline.py (PR: pipeline + tests)
+
+src/models/calibrator_manager.py (PR: calibrator + tests)
+
+scripts/walk_forward.py (PR: walk-forward + artifacts)
+
+scripts/grid_filters.py (PR: grid search thresholds)
+
+src/backtesting/enhanced_backtester.py (PR: backtester audit)
+
+src/backtesting/stake_strategies.py (PR: add volatility cap)
+
+scripts/paper_trader.py (PR: paper-trading)
+
+.github/workflows/ci.yml (PR: fix lint + tests)
+
+Dockerfile, docker-compose.yml (PR: productionise)
+
+docs/runbook.md (PR: doc + runbook)
+
+14. Tests & metrics to show progress
+
+Per-PR: include unit tests, mypy, black formatting.
+
+Key artifacts to produce: walkforward_results.csv, ev_bins.csv, trades_df.csv, calib_artifacts/.
+
+Monitor: Brier, LogLoss, ROI(walkfold median), Sharpe, Bets count.
+
+15. Prioritización sugerida (first 4 weeks)
+
+Week 1:
+
+Fix CI lint error (immediate)
+
+Implement & test CalibratorManager (global+champions)
+
+Run walk-forward baseline (save artifacts)
+
+Week 2:
+
+Harden FeaturePipeline (ELO+form) + vectorize odds features at inference
+
+Grid search thresholds to reach 40–60 bets target
+
+Week 3:
+
+Implement stake volatility cap and backtester improvements
+
+Paper-trading dry-run 2 weeks
+
+Week 4:
+
+Deploy Phase A micro-live (0.5% bankroll), monitoring & alerts
+
+16. Example code snippets (where useful)
+
+CalibratorManager skeleton, ELO update snippet, Kelly formula, stake cap check — (I can paste full files on request).
